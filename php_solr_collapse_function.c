@@ -285,6 +285,7 @@ PHP_METHOD(SolrCollapseFunction, __toString)
 
     solr_solrfunc_to_string(collapse_func, &buffer);
     ZVAL_STRINGL(return_value, buffer->str, buffer->len);
+    solr_string_free(buffer);
     efree(buffer);
 }
 /* }}} */
@@ -309,7 +310,7 @@ PHP_METHOD(SolrCollapseFunction, __wakeup)
 zend_object* solr_collapse_function_handlers_clone_object(zval *object TSRMLS_DC)
 {
     zend_object *fake;
-    fake = zend_objects_new(solr_ce_SolrCollapseFunction);
+    fake = zend_objects_new(zend_standard_class_def);
     solr_throw_exception_ex(solr_ce_SolrIllegalOperationException, SOLR_ERROR_4001 TSRMLS_CC, SOLR_FILE_LINE_FUNC, "Cloning of SolrCollapseFunction objects is currently not supported");
     return fake;
 }

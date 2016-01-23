@@ -133,24 +133,6 @@ PHP_SOLR_API void solr_query_register_class_constants(zend_class_entry *ce TSRML
 /* }}} */
 
 /** ************************************************************************ **/
-/** FUNCTIONS FOR REFERENCE COUNT MANAGEMENT                                 **/
-/** ************************************************************************ **/
-
-/** {{{ void solr_zval_add_ref(zval **p) */
-PHP_SOLR_API void solr_zval_add_ref(zval **p)
-{
-	Z_ADDREF_PP(p);
-}
-/* }}} */
-
-/** {{{ void solr_zval_minus_ref(zval **p) */
-PHP_SOLR_API void solr_zval_minus_ref(zval **p)
-{
-	Z_DELREF_PP(p);
-}
-/* }}} */
-
-/** ************************************************************************ **/
 /** UTILITY FUNCTIONS                                                        **/
 /** ************************************************************************ **/
 
@@ -732,8 +714,6 @@ static void solr_encode_solr_document_children(const xmlNode *node, xmlNode* bui
 
     for (current_index=0; current_index < child_docs_found; current_index++)
     {
-        int encoded_len;
-        char *encoded;
         zend_string *encoded_str;
 
         solr_string_t tmp_buffer;
@@ -754,16 +734,11 @@ static void solr_encode_solr_document_children(const xmlNode *node, xmlNode* bui
         solr_write_object_closer(&tmp_s_buffer);
 
         encoded_str = php_base64_encode((const unsigned char*)tmp_s_buffer.str, tmp_s_buffer.len);
-        encoded = encoded_str->val;
 
-        xmlNewChild(child_docs_node, NULL, (const xmlChar *) "dochash", (xmlChar *)encoded);
-
+        xmlNewChild(child_docs_node, NULL, (const xmlChar *) "dochash", (xmlChar *)encoded_str->val);
         solr_string_free_ex(&tmp_buffer);
         solr_string_free_ex(&tmp_s_buffer);
-        if (encoded)
-        {
-            efree(encoded);
-        }
+        zend_string_release(encoded_str);
     }
 }
 /* }}} */
@@ -897,18 +872,9 @@ static void solr_encode_document(const xmlNode *node, solr_string_t *buffer, sol
 /* {{{ static void solr_encode_document_field_simple(const xmlNode *fieldNode, xmlNode *field) */
 static void solr_encode_document_field_simple(const xmlNode *fieldNode, xmlNode *field)
 {
-	xmlChar *fieldname = NULL;
-	xmlChar *field_value = NULL;
+	xmlChar *fieldname = solr_xml_get_node_contents(fieldNode->properties);
 
-	fieldname = solr_xml_get_node_contents(fieldNode->properties);
-
-	if (strcmp((const char *)fieldname, "") == 0)
-	{
-	    /** todo throw an IllegalOperationException */
-	    return;
-	}
-
-	field_value = xmlEncodeEntitiesReentrant(fieldNode->doc, solr_xml_get_node_contents(fieldNode));
+	xmlChar *field_value = xmlEncodeEntitiesReentrant(fieldNode->doc, solr_xml_get_node_contents(fieldNode));
 
 	xmlNewChild(field, NULL, (xmlChar *) "field_value", field_value);
 
@@ -1011,11 +977,6 @@ static void solr_encode_result(const xmlNode *node, solr_string_t *buffer, solr_
 	    solr_string_append_long(buffer, 3); /* numFound, start, docs properties */
 	}
 
-    if (max_score) {
-        solr_string_append_long(buffer, 4); /* numFound, start, docs, maxScore properties */
-    } else {
-        solr_string_append_long(buffer, 3); /* numFound, start, docs properties */
-    }
 	solr_string_append_const(buffer, ":{"); /* Object Opener for response */
 
 	/* Writing the numFound property */
